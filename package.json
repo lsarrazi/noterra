@@ -1,0 +1,15 @@
+{
+  "name": "noterra",
+  "version": "1.0.0",
+  "description": "### Try the demo on GitHub pages: [https://donitzo.github.io/three.js-volume-renderer](https://donitzo.github.io/three.js-volume-renderer)",
+  "main": "App.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "http-server -c-1 -a localhost -p 4000"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "author": "",
+  "license": "ISC"
+}
