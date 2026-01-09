@@ -8,6 +8,7 @@
     "dev": "http-server -c-1 -a localhost -p 4000"
   },
   "devDependencies": {
+    "@types/three": "^0.182.0",
     "http-server": "^14.1.1"
   },
   "author": "",
