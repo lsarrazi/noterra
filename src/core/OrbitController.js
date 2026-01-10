@@ -1,19 +1,18 @@
 import * as THREE from "../../three.js/three.module.min.js";
-import { OrbitControls } from "../../three.js/OrbitControls.js";
 import { orbitConfig } from "../config/index.js";
+import { TrackballControls } from "../../three.js/TrackballControls.js";
 
 export default class OrbitController {
   constructor(camera, domElement) {
-    this.controls = new OrbitControls(camera, domElement);
-    this.controls.enableDamping = orbitConfig.enableDamping;
-    this.controls.dampingFactor = orbitConfig.dampingFactor;
+    this.controls = new TrackballControls(camera, domElement);
+    //this.controls.enableDamping = orbitConfig.enableDamping;
+    //this.controls.dampingFactor = orbitConfig.dampingFactor;
     this.controls.enableZoom = false;
+    this.controls.noZoom = true;
     this.controls.minDistance = orbitConfig.minDistance;
     this.controls.maxDistance = orbitConfig.maxDistance;
     this.controls.minAzimuthAngle = -Infinity;
     this.controls.maxAzimuthAngle = Infinity;
-    this.controls.minPolarAngle = 0;
-    this.controls.maxPolarAngle = Math.PI;
 
     this.baseRotateSpeed = orbitConfig.rotateBase;
     this.minRotateSpeed = orbitConfig.rotateMin;
@@ -88,9 +87,15 @@ export default class OrbitController {
 
   applyRotationDelta(deltaQ) {
     if (!deltaQ) return;
+    const q = deltaQ.normalize();
     const target = this.controls.target;
-    target.applyQuaternion(deltaQ);
-    this.controls.object.position.applyQuaternion(deltaQ);
+    target.applyQuaternion(q);
+    this.controls.object.position.applyQuaternion(q);
+    this.controls.object.up.applyQuaternion(q);
+
+    // Keep saved refs coherent so future interactions aren't drifted
+    if (this.controls.target0) this.controls.target0.applyQuaternion(q);
+    if (this.controls.position0) this.controls.position0.applyQuaternion(q);
     this.controls.update();
   }
 }

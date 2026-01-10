@@ -17,6 +17,9 @@ export default class PlanetApp {
     this.sceneManager = new SceneManager(canvas);
     this.sceneManager.setBackground(0x000020);
 
+    this.cameraTrackingEnabled = true;
+    this.cameraGuiState = null;
+
     // Camera setup
     this.sceneManager.camera.position.z = 2;
 
@@ -88,6 +91,39 @@ export default class PlanetApp {
       });
 
     planet.open();
+
+    const cameraFolder = gui.addFolder("Camera");
+    const cameraState = {
+      trackPlanet: this.cameraTrackingEnabled,
+      latitude: 0,
+      longitude: 0,
+      planetLatitude: 0,
+      planetLongitude: 0,
+    };
+
+    cameraFolder
+      .add(cameraState, "trackPlanet")
+      .name("Track planet")
+      .onChange((v) => {
+        this.cameraTrackingEnabled = !!v;
+      });
+
+    cameraFolder.add(cameraState, "latitude").name("Latitude (°)").listen();
+
+    cameraFolder.add(cameraState, "longitude").name("Longitude (°)").listen();
+
+    cameraFolder
+      .add(cameraState, "planetLatitude")
+      .name("Planet lat (°)")
+      .listen();
+
+    cameraFolder
+      .add(cameraState, "planetLongitude")
+      .name("Planet lon (°)")
+      .listen();
+
+    cameraFolder.open();
+    this.cameraGuiState = cameraState;
   }
 
   handleResize() {
@@ -108,20 +144,74 @@ export default class PlanetApp {
     this.orbit.updateZoom(this.sceneManager.camera, frameDt);
     this.orbit.updateRotateSpeed(this.sceneManager.camera);
 
-    const prevRot = this.planetSurface.currentRotation?.clone();
+    const prevRot = this.cameraTrackingEnabled
+      ? this.planetSurface.currentRotation?.clone()
+      : null;
 
     this.atmosphere.update(this.time);
     this.planetSurface.update(this.time, frameDt);
 
     const currRot = this.planetSurface.currentRotation;
-    if (prevRot && currRot) {
+    if (this.cameraTrackingEnabled && prevRot && currRot) {
       const deltaQ = currRot.clone().multiply(prevRot.clone().invert());
       this.orbit.applyRotationDelta(deltaQ);
     }
 
     this.orbit.update();
+    this.#updateCameraLatLon();
 
     this.sceneManager.render();
+  }
+
+  #updateCameraLatLon() {
+    if (!this.cameraGuiState) return;
+    const R = planetSurfaceConfig.radius;
+    const camera = this.sceneManager.camera;
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    dir.normalize();
+    const origin = camera.position.clone();
+
+    const a = dir.dot(dir); // should be 1
+    const b = 2 * origin.dot(dir);
+    const c = origin.dot(origin) - R * R;
+    const disc = b * b - 4 * a * c;
+
+    let hit = null;
+    if (disc >= 0) {
+      const sqrtDisc = Math.sqrt(disc);
+      const t1 = (-b - sqrtDisc) / (2 * a);
+      const t2 = (-b + sqrtDisc) / (2 * a);
+      const t = t1 > 0 ? t1 : t2 > 0 ? t2 : null;
+      if (t !== null) {
+        hit = origin.clone().addScaledVector(dir, t);
+      }
+    }
+
+    if (!hit) {
+      hit = dir.clone().negate().normalize().multiplyScalar(R);
+    }
+
+    const latRad = Math.asin(THREE.MathUtils.clamp(hit.y / R, -1, 1));
+    const lonRad = Math.atan2(hit.x, -hit.z);
+    const lat = THREE.MathUtils.radToDeg(latRad);
+    const lon = THREE.MathUtils.radToDeg(lonRad);
+
+    this.cameraGuiState.latitude = Number(lat.toFixed(2));
+    this.cameraGuiState.longitude = Number(lon.toFixed(2));
+
+    // Planet-frame lat/lon: rotate hit point into planet local space
+    const planetRot = this.planetSurface.currentRotation;
+    if (planetRot) {
+      const invRot = planetRot.clone().invert();
+      const localHit = hit.clone().applyQuaternion(invRot);
+      const platRad = Math.asin(THREE.MathUtils.clamp(localHit.y / R, -1, 1));
+      const plonRad = Math.atan2(localHit.x, -localHit.z);
+      const plat = THREE.MathUtils.radToDeg(platRad);
+      const plon = THREE.MathUtils.radToDeg(plonRad);
+      this.cameraGuiState.planetLatitude = Number(plat.toFixed(2));
+      this.cameraGuiState.planetLongitude = Number(plon.toFixed(2));
+    }
   }
 }
 
