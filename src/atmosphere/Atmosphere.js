@@ -42,7 +42,7 @@ if (dist < 0.5) { return 0.0; }
 return 1.0 - smoothstep(0.4, 0.6, dist);
 `;
 
-    this.volumeRenderer.updateMaterial({
+    this.materialOptions = {
       customFunction: planetFunction,
       useDirectionalLights: true,
       invertNormals: true,
@@ -50,11 +50,71 @@ return 1.0 - smoothstep(0.4, 0.6, dist);
       useExtinctionCoefficient: true,
       useValueAsExtinctionCoefficient: true,
       useRandomStart: true,
-    });
+    };
+
+    this.volumeRenderer.updateMaterial(this.materialOptions);
   }
 
   update(time) {
     this.volumeRenderer.uniforms.time.value = time;
     this.volumeRenderer.uniforms.random.value = Math.random();
+  }
+
+  setRaySteps(steps) {
+    this.materialOptions.raySteps = Math.max(1, Math.floor(steps));
+    this.volumeRenderer.updateMaterial(this.materialOptions);
+  }
+
+  setAlphaMultiplier(value) {
+    this.volumeRenderer.uniforms.alphaMultiplier.value = value;
+  }
+
+  setExtinctionMultiplier(value) {
+    this.volumeRenderer.uniforms.extinctionMultiplier.value = value;
+  }
+
+  getGuiSchema() {
+    const schema = [
+      {
+        key: "raySteps",
+        label: "Ray steps",
+        type: "slider",
+        min: 8,
+        max: 256,
+        step: 1,
+        get: () => this.materialOptions.raySteps,
+        set: (v) => this.setRaySteps(v),
+      },
+      {
+        key: "alphaMultiplier",
+        label: "Alpha gain",
+        type: "slider",
+        min: 0,
+        max: 3,
+        step: 0.05,
+        get: () => this.volumeRenderer.uniforms.alphaMultiplier.value,
+        set: (v) => this.setAlphaMultiplier(v),
+      },
+      {
+        key: "extinctionMultiplier",
+        label: "Extinction",
+        type: "slider",
+        min: 0,
+        max: 5,
+        step: 0.05,
+        get: () => this.volumeRenderer.uniforms.extinctionMultiplier.value,
+        set: (v) => this.setExtinctionMultiplier(v),
+      },
+    ];
+
+    return {
+      tabs: [
+        {
+          id: "atmosphere",
+          label: "Atmosphere",
+          schema,
+        },
+      ],
+    };
   }
 }

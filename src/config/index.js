@@ -19,9 +19,9 @@ export const orbitConfig = {
   zoomStepIn: 0.95, // multiplier when zooming in
   zoomStepOut: 1 / 0.95, // multiplier when zooming out
   zoomK: 6.0, // exponential convergence
-  rotateBase: 1.0,
+  rotateBase: 0.5,
   rotateMin: 0.0,
-  rotateEaseExp: 0.75,
+  rotateEaseExp: 0.85,
 };
 
 export const planetSurfaceConfig = {
@@ -41,7 +41,7 @@ export const planetSurfaceConfig = {
 };
 
 export const atmosphereConfig = {
-  raySteps: 64,
+  raySteps: 256,
   extinctionMultiplier: 1.0,
   alphaMultiplier: 1.0,
 };

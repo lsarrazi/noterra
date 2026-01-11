@@ -1,8 +1,67 @@
 version: "3.9"
 services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Dashboard (optionnel mais pratique)
+      - --api.dashboard=true
+
+      # Docker provider
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+
+      # EntryPoints
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+
+      # Redirect HTTP -> HTTPS
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+
+      # Let's Encrypt (ACME) via HTTP challenge
+      - --certificatesresolvers.le.acme.email=YOUR_EMAIL
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+
+      # Logs (optionnel)
+      - --log.level=INFO
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+
+    labels:
+      # Dashboard Traefik sur https://traefik.noterra.eu (optionnel)
+      # Si tu ne veux pas exposer le dashboard, supprime tout ce bloc labels.
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.noterra.eu`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.tls.certresolver=le
+      - traefik.http.routers.traefik.service=api@internal
+
   web:
-    build: .
-    image: noterra:web
+    image: ghcr.io/lsarrazi/noterra:latest
     ports:
       - "4000:4000"
     restart: unless-stopped
+    expose:
+      - "4000"
+    labels:
+      - traefik.enable=true
+
+      # noterra.eu + www.noterra.eu
+      - traefik.http.routers.noterra.rule=Host(`noterra.eu`,`www.noterra.eu`)
+      - traefik.http.routers.noterra.entrypoints=websecure
+      - traefik.http.routers.noterra.tls=true
+      - traefik.http.routers.noterra.tls.certresolver=le
+
+      # Indique à Traefik le port interne du container
+      - traefik.http.services.noterra.loadbalancer.server.port=4000
