@@ -1,4 +1,4 @@
-import * as THREE from "../../three.js/three.module.min.js";
+import * as THREE from "/three.module.min.js";
 import VolumeRenderer from "../../VolumeRenderer.js";
 import { atmosphereConfig } from "../config/index.js";
 

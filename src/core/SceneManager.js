@@ -1,4 +1,4 @@
-import * as THREE from "../../three.js/three.module.min.js";
+import * as THREE from "/three.module.min.js";
 import { rendererConfig, cameraConfig } from "../config/index.js";
 
 export default class SceneManager {
@@ -7,6 +7,10 @@ export default class SceneManager {
       canvas,
       logarithmicDepthBuffer: rendererConfig.logarithmicDepthBuffer,
     });
+    // Ensure pixel-store flags are safe for 3D textures globally
+    const gl = this.renderer.getContext();
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.renderer.setClearColor(rendererConfig.clearColor);
 
     this.scene = new THREE.Scene();
@@ -31,8 +35,9 @@ export default class SceneManager {
     const height = window.innerHeight;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(pixelRatio);
   }
 
   render() {

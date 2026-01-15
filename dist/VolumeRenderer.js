@@ -1,4 +1,9 @@
-import * as THREE from "/three.module.min.js";
+import * as THREE from '/three.module.min.js';
+
+// Ensure all 3D textures start with WebGL-safe flags
+THREE.Data3DTexture.prototype.flipY = false;
+THREE.Data3DTexture.prototype.premultiplyAlpha = false;
+THREE.Data3DTexture.prototype.unpackAlignment = 1;
 
 const vertexShader = `
 varying vec2 vUv;
@@ -663,6 +668,10 @@ export default class VolumeRenderer extends THREE.Mesh {
       textureSizeY,
       textureSizeZ
     );
+    // WebGL forbids flipY/premultiplyAlpha on 3D uploads; enforce safe defaults
+    texture.flipY = false;
+    texture.premultiplyAlpha = false;
+    texture.unpackAlignment = 1;
     texture.format = THREE.RedFormat;
     texture.type = THREE.HalfFloatType;
     texture.minFilter = textureFilter;
@@ -730,8 +739,12 @@ export default class VolumeRenderer extends THREE.Mesh {
     let minValue = Number.POSITIVE_INFINITY;
     let maxValue = Number.NEGATIVE_INFINITY;
 
-    // Force texture update
-    this.uniforms.volumeAtlas.value.needsUpdate = true;
+    // Force texture update and reassert forbidden flags before upload
+    const atlasTexture = this.uniforms.volumeAtlas.value;
+    atlasTexture.flipY = false;
+    atlasTexture.premultiplyAlpha = false;
+    atlasTexture.unpackAlignment = 1;
+    atlasTexture.needsUpdate = true;
 
     const voxels = this.uniforms.volumeAtlas.data;
 

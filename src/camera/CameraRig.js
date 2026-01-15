@@ -1,5 +1,5 @@
-import * as THREE from "../../three.js/three.module.min.js";
-import { TrackballControls } from "../../three.js/TrackballControls.js";
+import * as THREE from "/three.module.min.js";
+import { TrackballControls } from "/TrackballControls.js";
 import { orbitConfig } from "../config/index.js";
 
 function isCameraObservable(obj) {

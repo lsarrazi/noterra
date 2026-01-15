@@ -1,4 +1,4 @@
-import * as THREE from "./three.js/three.module.min.js";
+import * as THREE from "/three.module.min.js";
 import SceneManager from "./src/core/SceneManager.js";
 import CameraRig from "./src/camera/CameraRig.js";
 import PlanetView from "./src/planet/PlanetView.js";
@@ -110,5 +110,3 @@ export default class PlanetApp {
     this.sceneManager.render();
   }
 }
-
-PlanetApp._init();

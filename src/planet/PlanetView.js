@@ -1,4 +1,4 @@
-import * as THREE from "../../three.js/three.module.min.js";
+import * as THREE from "/three.module.min.js";
 import { planetSurfaceConfig } from "../config/index.js";
 import Atmosphere from "../atmosphere/Atmosphere.js";
 

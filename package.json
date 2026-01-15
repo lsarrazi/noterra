@@ -4,16 +4,18 @@
   "description": "### Try the demo on GitHub pages: [https://donitzo.github.io/three.js-volume-renderer](https://donitzo.github.io/three.js-volume-renderer)",
   "main": "App.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "http-server -c-1 -a localhost -p 4000"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "@types/three": "^0.182.0",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "tweakpane": "^4.0.1"
+    "tweakpane": "^4.0.5"
   }
 }
