@@ -1,3 +1,3 @@
-import PlanetApp from "../PlanetApp.js";
+import PlanetApp from "../PlanetApp";
 
 PlanetApp._init();

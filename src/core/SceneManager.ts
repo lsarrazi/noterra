@@ -1,8 +1,12 @@
-import * as THREE from "/three.module.min.js";
-import { rendererConfig, cameraConfig } from "../config/index.js";
+import * as THREE from "three";
+import { rendererConfig, cameraConfig } from "../config";
 
 export default class SceneManager {
-  constructor(canvas) {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+
+  constructor(canvas?: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       logarithmicDepthBuffer: rendererConfig.logarithmicDepthBuffer,
@@ -22,15 +26,15 @@ export default class SceneManager {
     );
   }
 
-  setBackground(color) {
-    this.scene.background = new THREE.Color(color);
+  setBackground(color: number | string): void {
+    this.scene.background = new THREE.Color(color as THREE.ColorRepresentation);
   }
 
-  add(obj) {
+  add(obj: THREE.Object3D): void {
     this.scene.add(obj);
   }
 
-  onResize() {
+  onResize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.camera.aspect = width / height;
@@ -40,7 +44,7 @@ export default class SceneManager {
     this.renderer.setPixelRatio(pixelRatio);
   }
 
-  render() {
+  render(): void {
     this.renderer.render(this.scene, this.camera);
   }
 }

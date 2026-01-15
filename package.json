@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "three": "^0.182.0",
     "tweakpane": "^4.0.5"
   }
 }

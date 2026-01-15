@@ -3,10 +3,10 @@ import VolumeSamplers from "./VolumeSamplers.js";
 
 import nifti from "./nifti-reader.js";
 
-import * as THREE from "/three.module.min.js";
-import { OBJLoader } from "/OBJLoader.js";
-import { OrbitControls } from "/OrbitControls.js";
-import * as BufferGeometryUtils from "/BufferGeometryUtils.js";
+import * as THREE from "three";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 const samples = {
   "Animated Smoke": "nifti_samples/fds_smoke.nii.gz",

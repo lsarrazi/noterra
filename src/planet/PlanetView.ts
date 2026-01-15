@@ -1,8 +1,51 @@
-import * as THREE from "/three.module.min.js";
-import { planetSurfaceConfig } from "../config/index.js";
-import Atmosphere from "../atmosphere/Atmosphere.js";
+import * as THREE from "three";
+import { planetSurfaceConfig } from "../config";
+import Atmosphere from "../atmosphere/Atmosphere";
+
+type PlanetViewUniforms = {
+  uTime: { value: number };
+  uScale: { value: number };
+  uSeaLevel: { value: number };
+  uSeaColor: { value: THREE.Color };
+  uLandLow: { value: THREE.Color };
+  uLandHigh: { value: THREE.Color };
+  uNormalStrength: { value: number };
+  uDetailScale: { value: number };
+  uDetailStrength: { value: number };
+  uGridWidth: { value: number };
+  uShowGrid: { value: number };
+  uGridStrength: { value: number };
+  uGridColor: { value: THREE.Color };
+};
+
+type GuiSchemaEntry = {
+  key?: string;
+  label?: string;
+  type: "toggle" | "slider" | "color" | "folder";
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ value: number; text: string }>;
+  get?: () => any;
+  set?: (v: any) => void;
+  schema?: GuiSchemaEntry[];
+};
+
+type GuiTab = { id: string; label: string; schema: GuiSchemaEntry[] };
+
+type GuiTabs = { tabs: GuiTab[] };
 
 export default class PlanetView {
+  axialTiltDeg: number;
+  atmosphere: Atmosphere;
+  cameraPrefs: { trackRotation: boolean; minDistance: number; maxDistance: number };
+  uniforms: PlanetViewUniforms;
+  baseGridWidth: number;
+  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+  axisHelper: THREE.Group;
+  currentRotation: THREE.Quaternion;
+  group: THREE.Group;
+
   constructor() {
     this.axialTiltDeg = planetSurfaceConfig.axialTilt;
     this.atmosphere = new Atmosphere();
@@ -40,7 +83,7 @@ export default class PlanetView {
 
     this.baseGridWidth = 0.02;
 
-    m.onBeforeCompile = (shader) => {
+    m.onBeforeCompile = (shader: THREE.Shader) => {
       Object.assign(shader.uniforms, this.uniforms);
 
       shader.vertexShader = shader.vertexShader.replace(
@@ -163,7 +206,7 @@ export default class PlanetView {
 
     this.mesh = new THREE.Mesh(g, m);
 
-    this.axisHelper = this.#createAxisHelper();
+    this.axisHelper = this.createAxisHelper();
     this.axisHelper.visible = false;
 
     this.currentRotation = new THREE.Quaternion();
@@ -172,47 +215,47 @@ export default class PlanetView {
     this.group.add(this.mesh);
   }
 
-  setScale(v) {
+  setScale(v: number): void {
     this.uniforms.uScale.value = v;
   }
 
-  setSeaLevel(v) {
+  setSeaLevel(v: number): void {
     this.uniforms.uSeaLevel.value = v;
   }
 
-  setSeaColor(hex) {
+  setSeaColor(hex: number | string): void {
     this.uniforms.uSeaColor.value.set(hex);
   }
 
-  setLandLow(hex) {
+  setLandLow(hex: number | string): void {
     this.uniforms.uLandLow.value.set(hex);
   }
 
-  setLandHigh(hex) {
+  setLandHigh(hex: number | string): void {
     this.uniforms.uLandHigh.value.set(hex);
   }
 
-  setNormalStrength(v) {
+  setNormalStrength(v: number): void {
     this.uniforms.uNormalStrength.value = v;
   }
 
-  setDetailScale(v) {
+  setDetailScale(v: number): void {
     this.uniforms.uDetailScale.value = v;
   }
 
-  setDetailStrength(v) {
+  setDetailStrength(v: number): void {
     this.uniforms.uDetailStrength.value = v;
   }
 
-  setGridColor(hex) {
+  setGridColor(hex: number | string): void {
     this.uniforms.uGridColor.value.set(hex);
   }
 
-  setGridWidth(width) {
+  setGridWidth(width: number): void {
     this.uniforms.uGridWidth.value = width;
   }
 
-  updateGridWidthForCamera(camera, viewportHeight) {
+  updateGridWidthForCamera(camera: THREE.PerspectiveCamera, viewportHeight: number): void {
     if (!camera) return;
     const dist = camera.position.length();
     const radius = planetSurfaceConfig.radius;
@@ -221,7 +264,7 @@ export default class PlanetView {
     this.setGridWidth(width);
   }
 
-  update(time, dt = 0.016) {
+  update(time: number, dt = 0.016): void {
     if (this.uniforms?.uTime) {
       this.uniforms.uTime.value = time;
     }
@@ -229,14 +272,14 @@ export default class PlanetView {
     this.atmosphere?.update(time);
   }
 
-  updateRotationAngle(time) {
+  updateRotationAngle(time: number): void {
     const rotQ = this.getRotationQuaternion(time);
     this.mesh.setRotationFromQuaternion(rotQ);
     this.axisHelper?.setRotationFromQuaternion(rotQ);
     this.currentRotation.copy(rotQ);
   }
 
-  getRotationQuaternion(time) {
+  getRotationQuaternion(time: number): THREE.Quaternion {
     const SIDEREAL_DAY_S = 86164.0905 / 1000;
     const OMEGA = (2 * Math.PI) / SIDEREAL_DAY_S; // rad/s
 
@@ -256,24 +299,24 @@ export default class PlanetView {
     return rotQ;
   }
 
-  setAxialTilt(deg) {
+  setAxialTilt(deg: number): void {
     this.axialTiltDeg = deg;
   }
 
-  setGridVisible(visible) {
+  setGridVisible(visible: boolean): void {
     this.uniforms.uShowGrid.value = visible ? 1.0 : 0.0;
   }
 
-  setGridStrength(value) {
+  setGridStrength(value: number): void {
     this.uniforms.uGridStrength.value = value;
   }
 
-  setAxisVisible(visible) {
+  setAxisVisible(visible: boolean): void {
     this.axisHelper.visible = !!visible;
   }
 
-  getGuiSchema() {
-    const helpersFolder = {
+  getGuiSchema(): GuiTabs {
+    const helpersFolder: GuiSchemaEntry = {
       type: "folder",
       label: "Helpers",
       schema: [
@@ -282,14 +325,14 @@ export default class PlanetView {
           label: "Show grid",
           type: "toggle",
           get: () => this.uniforms.uShowGrid.value > 0.5,
-          set: (v) => this.setGridVisible(v),
+          set: (v: boolean) => this.setGridVisible(v),
         },
         {
           key: "axis",
           label: "Show axis",
           type: "toggle",
           get: () => this.axisHelper.visible,
-          set: (v) => this.setAxisVisible(v),
+          set: (v: boolean) => this.setAxisVisible(v),
         },
         {
           key: "gridStrength",
@@ -299,19 +342,19 @@ export default class PlanetView {
           max: 1,
           step: 0.01,
           get: () => this.uniforms.uGridStrength.value,
-          set: (v) => this.setGridStrength(v),
+          set: (v: number) => this.setGridStrength(v),
         },
         {
           key: "gridColor",
           label: "Grid color",
           type: "color",
           get: () => `#${this.uniforms.uGridColor.value.getHexString()}`,
-          set: (v) => this.setGridColor(v),
+          set: (v: string) => this.setGridColor(v),
         },
       ],
     };
 
-    const general = [
+    const general: GuiSchemaEntry[] = [
       {
         key: "scale",
         label: "Scale",
@@ -320,7 +363,7 @@ export default class PlanetView {
         max: 20,
         step: 0.01,
         get: () => this.uniforms.uScale.value,
-        set: (v) => this.setScale(v),
+        set: (v: number) => this.setScale(v),
       },
       {
         key: "seaLevel",
@@ -330,28 +373,28 @@ export default class PlanetView {
         max: 1.0,
         step: 0.001,
         get: () => this.uniforms.uSeaLevel.value,
-        set: (v) => this.setSeaLevel(v),
+        set: (v: number) => this.setSeaLevel(v),
       },
       {
         key: "seaColor",
         label: "Sea color",
         type: "color",
         get: () => `#${this.uniforms.uSeaColor.value.getHexString()}`,
-        set: (v) => this.setSeaColor(v),
+        set: (v: string) => this.setSeaColor(v),
       },
       {
         key: "landLow",
         label: "Land low color",
         type: "color",
         get: () => `#${this.uniforms.uLandLow.value.getHexString()}`,
-        set: (v) => this.setLandLow(v),
+        set: (v: string) => this.setLandLow(v),
       },
       {
         key: "landHigh",
         label: "Land high color",
         type: "color",
         get: () => `#${this.uniforms.uLandHigh.value.getHexString()}`,
-        set: (v) => this.setLandHigh(v),
+        set: (v: string) => this.setLandHigh(v),
       },
       {
         key: "normalStrength",
@@ -361,7 +404,7 @@ export default class PlanetView {
         max: 1.0,
         step: 0.01,
         get: () => this.uniforms.uNormalStrength.value,
-        set: (v) => this.setNormalStrength(v),
+        set: (v: number) => this.setNormalStrength(v),
       },
       {
         key: "detailScale",
@@ -371,7 +414,7 @@ export default class PlanetView {
         max: 40.0,
         step: 0.1,
         get: () => this.uniforms.uDetailScale.value,
-        set: (v) => this.setDetailScale(v),
+        set: (v: number) => this.setDetailScale(v),
       },
       {
         key: "detailStrength",
@@ -381,7 +424,7 @@ export default class PlanetView {
         max: 20000,
         step: 10,
         get: () => this.uniforms.uDetailStrength.value,
-        set: (v) => this.setDetailStrength(v),
+        set: (v: number) => this.setDetailStrength(v),
       },
       {
         key: "axialTilt",
@@ -391,18 +434,18 @@ export default class PlanetView {
         max: 90,
         step: 0.01,
         get: () => this.axialTiltDeg,
-        set: (v) => this.setAxialTilt(v),
+        set: (v: number) => this.setAxialTilt(v),
       },
       helpersFolder,
     ];
 
-    const cameraPanel = [
+    const cameraPanel: GuiSchemaEntry[] = [
       {
         key: "trackRotation",
         label: "Track rotation",
         type: "toggle",
         get: () => this.cameraPrefs.trackRotation,
-        set: (v) => (this.cameraPrefs.trackRotation = !!v),
+        set: (v: boolean) => (this.cameraPrefs.trackRotation = !!v),
       },
       {
         key: "minDistance",
@@ -412,7 +455,7 @@ export default class PlanetView {
         max: 2.0,
         step: 0.01,
         get: () => this.cameraPrefs.minDistance,
-        set: (v) => (this.cameraPrefs.minDistance = v),
+        set: (v: number) => (this.cameraPrefs.minDistance = v),
       },
       {
         key: "maxDistance",
@@ -422,7 +465,7 @@ export default class PlanetView {
         max: 8.0,
         step: 0.01,
         get: () => this.cameraPrefs.maxDistance,
-        set: (v) => (this.cameraPrefs.maxDistance = v),
+        set: (v: number) => (this.cameraPrefs.maxDistance = v),
       },
     ];
 
@@ -430,7 +473,7 @@ export default class PlanetView {
       tabs: [
         { id: "general", label: "General", schema: general },
         { id: "camera", label: "Camera", schema: cameraPanel },
-        ...(this.atmosphere?.getGuiSchema()?.tabs ?? []),
+        ...(this.atmosphere?.getGuiSchema?.()?.tabs ?? []),
       ],
     };
   }
@@ -446,11 +489,11 @@ export default class PlanetView {
     };
   }
 
-  getAtmosphereObject() {
-    return this.atmosphere?.volumeRenderer ?? null;
+  getAtmosphereObject(): THREE.Object3D | null {
+    return (this.atmosphere as any)?.volumeRenderer ?? null;
   }
 
-  #createAxisHelper() {
+  private createAxisHelper(): THREE.Group {
     const g = new THREE.Group();
     const length = planetSurfaceConfig.radius * 3.0;
     const radius = planetSurfaceConfig.radius * 0.02;

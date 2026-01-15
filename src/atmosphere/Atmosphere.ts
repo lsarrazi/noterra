@@ -1,8 +1,38 @@
-import * as THREE from "/three.module.min.js";
-import VolumeRenderer from "../../VolumeRenderer.js";
-import { atmosphereConfig } from "../config/index.js";
+import * as THREE from "three";
+import VolumeRenderer from "../../VolumeRenderer";
+import { atmosphereConfig } from "../config";
+
+type AtmosphereMaterialOptions = {
+  customFunction: string;
+  useDirectionalLights: boolean;
+  invertNormals: boolean;
+  raySteps: number;
+  useExtinctionCoefficient: boolean;
+  useValueAsExtinctionCoefficient: boolean;
+  useRandomStart: boolean;
+};
+
+type AtmosphereGuiSchema = {
+  tabs: Array<{
+    id: string;
+    label: string;
+    schema: Array<{
+      key: string;
+      label: string;
+      type: "slider";
+      min: number;
+      max: number;
+      step: number;
+      get: () => number;
+      set: (v: number) => void;
+    }>;
+  }>;
+};
 
 export default class Atmosphere {
+  volumeRenderer: any;
+  materialOptions: AtmosphereMaterialOptions;
+
   constructor() {
     this.volumeRenderer = new VolumeRenderer();
     const uniforms = this.volumeRenderer.uniforms;
@@ -15,6 +45,7 @@ export default class Atmosphere {
     canvas.width = 256;
     canvas.height = 1;
     const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get 2D context for atmosphere palette");
     const gradient = ctx.createLinearGradient(0, 0, 256, 0);
     gradient.addColorStop(0.0, "rgba(99, 183, 252, 0.5)");
     gradient.addColorStop(0.6, "rgba(42, 79, 109, 0.5)");
@@ -55,55 +86,55 @@ return 1.0 - smoothstep(0.4, 0.6, dist);
     this.volumeRenderer.updateMaterial(this.materialOptions);
   }
 
-  update(time) {
+  update(time: number): void {
     this.volumeRenderer.uniforms.time.value = time;
     this.volumeRenderer.uniforms.random.value = Math.random();
   }
 
-  setRaySteps(steps) {
+  setRaySteps(steps: number): void {
     this.materialOptions.raySteps = Math.max(1, Math.floor(steps));
     this.volumeRenderer.updateMaterial(this.materialOptions);
   }
 
-  setAlphaMultiplier(value) {
+  setAlphaMultiplier(value: number): void {
     this.volumeRenderer.uniforms.alphaMultiplier.value = value;
   }
 
-  setExtinctionMultiplier(value) {
+  setExtinctionMultiplier(value: number): void {
     this.volumeRenderer.uniforms.extinctionMultiplier.value = value;
   }
 
-  getGuiSchema() {
+  getGuiSchema(): AtmosphereGuiSchema {
     const schema = [
       {
         key: "raySteps",
         label: "Ray steps",
-        type: "slider",
+        type: "slider" as const,
         min: 8,
         max: 256,
         step: 1,
         get: () => this.materialOptions.raySteps,
-        set: (v) => this.setRaySteps(v),
+        set: (v: number) => this.setRaySteps(v),
       },
       {
         key: "alphaMultiplier",
         label: "Alpha gain",
-        type: "slider",
+        type: "slider" as const,
         min: 0,
         max: 3,
         step: 0.05,
         get: () => this.volumeRenderer.uniforms.alphaMultiplier.value,
-        set: (v) => this.setAlphaMultiplier(v),
+        set: (v: number) => this.setAlphaMultiplier(v),
       },
       {
         key: "extinctionMultiplier",
         label: "Extinction",
-        type: "slider",
+        type: "slider" as const,
         min: 0,
         max: 5,
         step: 0.05,
         get: () => this.volumeRenderer.uniforms.extinctionMultiplier.value,
-        set: (v) => this.setExtinctionMultiplier(v),
+        set: (v: number) => this.setExtinctionMultiplier(v),
       },
     ];
 

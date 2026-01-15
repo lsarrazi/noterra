@@ -6,15 +6,28 @@ import GuiManager from "./src/ui/GuiManager";
 import { planetSurfaceConfig } from "./src/config";
 
 export default class PlanetApp {
-  static _init() {
+  static _init(): void {
     window.addEventListener("load", () => {
       new PlanetApp();
     });
   }
 
+  sceneManager: SceneManager;
+  guiManager: GuiManager | null;
+  cameraRig: CameraRig;
+  planetSurface: PlanetView;
+  objectsRegistry: Array<{
+    id: string;
+    label: string;
+    object: unknown;
+    getGuiSchema: () => unknown;
+  }>;
+  lastTime: number | null;
+  time: number;
+
   constructor() {
-    const canvas = document.querySelector("canvas");
-    this.sceneManager = new SceneManager(canvas);
+    const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+    this.sceneManager = new SceneManager(canvas ?? undefined);
     this.sceneManager.setBackground(0x000020);
     this.guiManager = null;
 
@@ -26,7 +39,7 @@ export default class PlanetApp {
       this.sceneManager.camera,
       this.sceneManager.renderer.domElement
     );
-    this.planetSurface = new PlanetView();
+    this.planetSurface = new PlanetView(planetSurfaceConfig);
 
     this.objectsRegistry = [
       {
@@ -45,7 +58,7 @@ export default class PlanetApp {
 
     this.cameraRig.setObjectResolver((id) => {
       const entry = this.objectsRegistry.find((o) => o.id === id);
-      return entry?.object ?? null;
+      return (entry?.object as THREE.Object3D | null) ?? null;
     });
     this.cameraRig.setObservableById("planet");
 
@@ -71,7 +84,7 @@ export default class PlanetApp {
     this.animate();
   }
 
-  #setupGui() {
+  #setupGui(): void {
     this.guiManager = new GuiManager();
     if (!this.guiManager.isReady()) return;
 
@@ -80,11 +93,11 @@ export default class PlanetApp {
     this.guiManager.setObjectsRegistry(this.objectsRegistry);
   }
 
-  handleResize() {
+  handleResize(): void {
     this.sceneManager.onResize();
   }
 
-  animate() {
+  animate(): void {
     requestAnimationFrame(() => this.animate());
     const now = performance.now();
     let frameDt = 0;
