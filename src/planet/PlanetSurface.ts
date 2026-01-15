@@ -2,72 +2,72 @@ import * as THREE from "three";
 import { planetSurfaceConfig } from "../config";
 
 type PlanetUniforms = {
-  uTime: { value: number };
-  uScale: { value: number };
-  uSeaLevel: { value: number };
-  uSeaColor: { value: THREE.Color };
-  uLandLow: { value: THREE.Color };
-  uLandHigh: { value: THREE.Color };
-  uNormalStrength: { value: number };
-  uDetailScale: { value: number };
-  uDetailStrength: { value: number };
-  uShowGrid: { value: number };
-  uGridStrength: { value: number };
-  uGridColor: { value: THREE.Color };
+    uTime: { value: number };
+    uScale: { value: number };
+    uSeaLevel: { value: number };
+    uSeaColor: { value: THREE.Color };
+    uLandLow: { value: THREE.Color };
+    uLandHigh: { value: THREE.Color };
+    uNormalStrength: { value: number };
+    uDetailScale: { value: number };
+    uDetailStrength: { value: number };
+    uShowGrid: { value: number };
+    uGridStrength: { value: number };
+    uGridColor: { value: THREE.Color };
 };
 
 export default class PlanetSurface {
-  uniforms: PlanetUniforms;
-  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
-  axisHelper: THREE.Group;
-  group: THREE.Group;
-  currentRotation: THREE.Quaternion;
+    uniforms: PlanetUniforms;
+    mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+    axisHelper: THREE.Group;
+    group: THREE.Group;
+    currentRotation: THREE.Quaternion;
 
-  constructor() {
-    const geometry = new THREE.SphereGeometry(
-      planetSurfaceConfig.radius,
-      planetSurfaceConfig.segments,
-      planetSurfaceConfig.segments
-    );
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.85,
-      metalness: 0.0,
-    });
+    constructor() {
+        const geometry = new THREE.SphereGeometry(
+            planetSurfaceConfig.radius,
+            planetSurfaceConfig.segments,
+            planetSurfaceConfig.segments
+        );
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.85,
+            metalness: 0.0,
+        });
 
-    this.uniforms = {
-      uTime: { value: 0 },
-      uScale: { value: planetSurfaceConfig.scale },
-      uSeaLevel: { value: planetSurfaceConfig.seaLevel },
-      uSeaColor: { value: new THREE.Color(planetSurfaceConfig.seaColor) },
-      uLandLow: { value: new THREE.Color(planetSurfaceConfig.landLow) },
-      uLandHigh: { value: new THREE.Color(planetSurfaceConfig.landHigh) },
-      uNormalStrength: { value: planetSurfaceConfig.normalStrength },
-      uDetailScale: { value: planetSurfaceConfig.detailScale },
-      uDetailStrength: { value: planetSurfaceConfig.detailStrength },
-      uShowGrid: { value: 0.0 },
-      uGridStrength: { value: planetSurfaceConfig.gridStrength },
-      uGridColor: { value: new THREE.Color(planetSurfaceConfig.gridColor) },
-    };
+        this.uniforms = {
+            uTime: { value: 0 },
+            uScale: { value: planetSurfaceConfig.scale },
+            uSeaLevel: { value: planetSurfaceConfig.seaLevel },
+            uSeaColor: { value: new THREE.Color(planetSurfaceConfig.seaColor) },
+            uLandLow: { value: new THREE.Color(planetSurfaceConfig.landLow) },
+            uLandHigh: { value: new THREE.Color(planetSurfaceConfig.landHigh) },
+            uNormalStrength: { value: planetSurfaceConfig.normalStrength },
+            uDetailScale: { value: planetSurfaceConfig.detailScale },
+            uDetailStrength: { value: planetSurfaceConfig.detailStrength },
+            uShowGrid: { value: 0.0 },
+            uGridStrength: { value: planetSurfaceConfig.gridStrength },
+            uGridColor: { value: new THREE.Color(planetSurfaceConfig.gridColor) },
+        };
 
-    material.onBeforeCompile = (shader: THREE.Shader) => {
-      Object.assign(shader.uniforms, this.uniforms);
+        material.onBeforeCompile = (shader: THREE.Shader) => {
+            Object.assign(shader.uniforms, this.uniforms);
 
-      shader.vertexShader = shader.vertexShader.replace(
-        "varying vec3 vViewPosition;",
-        "varying vec3 vViewPosition;\n  varying vec3 vWorldNormal;\n  varying vec3 vObjectNormal;"
-      );
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <defaultnormal_vertex>",
-        `#include <defaultnormal_vertex>
+            shader.vertexShader = shader.vertexShader.replace(
+                "varying vec3 vViewPosition;",
+                "varying vec3 vViewPosition;\n  varying vec3 vWorldNormal;\n  varying vec3 vObjectNormal;"
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                "#include <defaultnormal_vertex>",
+                `#include <defaultnormal_vertex>
           vWorldNormal = normalize(mat3(modelMatrix) * objectNormal);
           // Keep object-space normal to anchor procedural sampling to the planet
           vObjectNormal = normalize(objectNormal);
         `
-      );
+            );
 
-      shader.fragmentShader =
-        `
+            shader.fragmentShader =
+                `
         uniform float uTime;
         uniform float uScale;
         uniform float uSeaLevel;
@@ -129,14 +129,14 @@ export default class PlanetSurface {
         }
       ` + shader.fragmentShader;
 
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "varying vec3 vViewPosition;",
-        "varying vec3 vViewPosition;\n  varying vec3 vWorldNormal;\n  varying vec3 vObjectNormal;"
-      );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                "varying vec3 vViewPosition;",
+                "varying vec3 vViewPosition;\n  varying vec3 vWorldNormal;\n  varying vec3 vObjectNormal;"
+            );
 
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <color_fragment>",
-        `#include <color_fragment>
+            shader.fragmentShader = shader.fragmentShader.replace(
+                "#include <color_fragment>",
+                `#include <color_fragment>
           // Sample detail in object space so the pattern rides with the planet
           vec3 objN = normalize(vObjectNormal);
           vec3 p = objN * uScale;
@@ -167,105 +167,105 @@ export default class PlanetSurface {
 
           diffuseColor.rgb *= lightBoost;
         `
-      );
-    };
+            );
+        };
 
-    this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh = new THREE.Mesh(geometry, material);
 
-    // Axis helper stays in the scene root (non-rotating reference)
-    this.axisHelper = this.createAxisHelper();
-    this.axisHelper.visible = false;
+        // Axis helper stays in the scene root (non-rotating reference)
+        this.axisHelper = this.createAxisHelper();
+        this.axisHelper.visible = false;
 
-    this.currentRotation = new THREE.Quaternion();
+        this.currentRotation = new THREE.Quaternion();
 
-    // Root group exposed to the scene; only the mesh is rotated
-    this.group = new THREE.Group();
-    this.group.add(this.mesh);
-  }
-
-  update(time: number, dt = 0.016): void {
-    if (this.uniforms?.uTime) {
-      this.uniforms.uTime.value = time;
+        // Root group exposed to the scene; only the mesh is rotated
+        this.group = new THREE.Group();
+        this.group.add(this.mesh);
     }
 
-    this.updateRotationAngle(time);
-  }
+    update(time: number, dt = 0.016): void {
+        if (this.uniforms?.uTime) {
+            this.uniforms.uTime.value = time;
+        }
 
-  updateRotationAngle(time: number): void {
-    const rotQ = this.getRotationQuaternion(time);
-    this.mesh.setRotationFromQuaternion(rotQ);
-    this.axisHelper?.setRotationFromQuaternion(rotQ);
-    this.currentRotation.copy(rotQ);
-  }
+        this.updateRotationAngle(time);
+    }
 
-  getRotationQuaternion(time: number): THREE.Quaternion {
-    const SIDEREAL_DAY_S = 86164.0905 / 1000;
-    const OMEGA = (2 * Math.PI) / SIDEREAL_DAY_S; // rad/s
+    updateRotationAngle(time: number): void {
+        const rotQ = this.getRotationQuaternion(time);
+        this.mesh.setRotationFromQuaternion(rotQ);
+        this.axisHelper?.setRotationFromQuaternion(rotQ);
+        this.currentRotation.copy(rotQ);
+    }
 
-    const angle = (OMEGA * time) % (2 * Math.PI);
-    const tiltAngle = THREE.MathUtils.degToRad(planetSurfaceConfig.axialTilt);
-    const axis = new THREE.Vector3(0, 1, 0);
-    const spinQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-    const tiltQ = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 0, 1),
-      tiltAngle
-    );
-    const rotQ = new THREE.Quaternion()
-      .copy(spinQ)
-      .multiplyQuaternions(tiltQ, spinQ)
-      .normalize();
+    getRotationQuaternion(time: number): THREE.Quaternion {
+        const SIDEREAL_DAY_S = 86164.0905 / 1000;
+        const OMEGA = (2 * Math.PI) / SIDEREAL_DAY_S; // rad/s
 
-    return rotQ;
-  }
+        const angle = (OMEGA * time) % (2 * Math.PI);
+        const tiltAngle = THREE.MathUtils.degToRad(planetSurfaceConfig.axialTilt);
+        const axis = new THREE.Vector3(0, 1, 0);
+        const spinQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        const tiltQ = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1),
+            tiltAngle
+        );
+        const rotQ = new THREE.Quaternion()
+            .copy(spinQ)
+            .multiplyQuaternions(tiltQ, spinQ)
+            .normalize();
 
-  setGridVisible(visible: boolean): void {
-    this.uniforms.uShowGrid.value = visible ? 1.0 : 0.0;
-  }
+        return rotQ;
+    }
 
-  setGridStrength(value: number): void {
-    this.uniforms.uGridStrength.value = value;
-  }
+    setGridVisible(visible: boolean): void {
+        this.uniforms.uShowGrid.value = visible ? 1.0 : 0.0;
+    }
 
-  setAxisVisible(visible: boolean): void {
-    this.axisHelper.visible = !!visible;
-  }
+    setGridStrength(value: number): void {
+        this.uniforms.uGridStrength.value = value;
+    }
 
-  private createAxisHelper(): THREE.Group {
-    const group = new THREE.Group();
-    const length = planetSurfaceConfig.radius * 3.0;
-    const radius = planetSurfaceConfig.radius * 0.02;
-    const thickness = 16;
+    setAxisVisible(visible: boolean): void {
+        this.axisHelper.visible = !!visible;
+    }
 
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffcc66,
-      depthTest: false,
-    });
-    const cylGeom = new THREE.CylinderGeometry(
-      radius,
-      radius,
-      length,
-      thickness
-    );
-    const cyl = new THREE.Mesh(cylGeom, mat);
-    group.add(cyl);
+    private createAxisHelper(): THREE.Group {
+        const group = new THREE.Group();
+        const length = planetSurfaceConfig.radius * 3.0;
+        const radius = planetSurfaceConfig.radius * 0.02;
+        const thickness = 16;
 
-    const tipMat = new THREE.MeshBasicMaterial({
-      color: 0xff8855,
-      depthTest: false,
-    });
-    const tipGeom = new THREE.ConeGeometry(radius * 2.5, radius * 5, thickness);
-    const tipNorth = new THREE.Mesh(tipGeom, tipMat);
-    tipNorth.position.y = length * 0.5;
-    group.add(tipNorth);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffcc66,
+            depthTest: false,
+        });
+        const cylGeom = new THREE.CylinderGeometry(
+            radius,
+            radius,
+            length,
+            thickness
+        );
+        const cyl = new THREE.Mesh(cylGeom, mat);
+        group.add(cyl);
 
-    const tipSouth = new THREE.Mesh(tipGeom, tipMat);
-    tipSouth.rotation.x = Math.PI;
-    tipSouth.position.y = -length * 0.5;
-    group.add(tipSouth);
+        const tipMat = new THREE.MeshBasicMaterial({
+            color: 0xff8855,
+            depthTest: false,
+        });
+        const tipGeom = new THREE.ConeGeometry(radius * 2.5, radius * 5, thickness);
+        const tipNorth = new THREE.Mesh(tipGeom, tipMat);
+        tipNorth.position.y = length * 0.5;
+        group.add(tipNorth);
 
-    group.renderOrder = 2;
-    group.frustumCulled = false;
+        const tipSouth = new THREE.Mesh(tipGeom, tipMat);
+        tipSouth.rotation.x = Math.PI;
+        tipSouth.position.y = -length * 0.5;
+        group.add(tipSouth);
 
-    return group;
-  }
+        group.renderOrder = 2;
+        group.frustumCulled = false;
+
+        return group;
+    }
 }
