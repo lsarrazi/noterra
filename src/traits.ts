@@ -92,3 +92,4 @@ export function trait<T extends object, StatefulOption extends boolean, C extend
     };
 }
 
+export type Trait = new () => any

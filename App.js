@@ -51,7 +51,7 @@ export default class App {
     this.#directionalLight.visible = false;
     this.#scene.add(this.#directionalLight);
 
-    this.#pointLight = new THREE.PointLight(0xffffff, 1, 3);
+    this.#pointLight = new THREE.PointLight(0xffffff, 10, 3);
     this.#pointLight.add(new THREE.Mesh(new THREE.SphereGeometry(0.03)));
     this.#pointLight.visible = false;
     this.#scene.add(this.#pointLight);
@@ -64,7 +64,7 @@ export default class App {
     // Create a spinning cube
     this.#spinningCube = new THREE.Mesh(
       new THREE.BoxGeometry(),
-      new THREE.MeshLambertMaterial()
+      new THREE.MeshLambertMaterial(),
     );
     this.#spinningCube.visible = false;
     this.#scene.add(this.#spinningCube);
@@ -74,19 +74,19 @@ export default class App {
     depthTexture.format = THREE.DepthFormat;
     depthTexture.type = THREE.UnsignedShortType;
 
-    this.#renderTarget = new THREE.WebGLRenderTarget(64, 64, {
+    this.#renderTarget = new THREE.WebGLRenderTarget(128, 128, {
       depthTexture: depthTexture,
       depthBuffer: true,
     });
 
     // Create a perspective camera
-    this.#camera = new THREE.PerspectiveCamera(75, 1, 0.01, 10);
+    this.#camera = new THREE.PerspectiveCamera(75, 1, 0.01, 100);
     this.#camera.position.z = 2;
 
     // Create camera controls
     this.#orbitControls = new OrbitControls(
       this.#camera,
-      this.#renderer.domElement
+      this.#renderer.domElement,
     );
     this.#orbitControls.enableDamping = true;
     this.#orbitControls.dampingFactor = 0.1;
@@ -103,13 +103,15 @@ export default class App {
 
     // Create a volume renderer
     this.#volumeRenderer = new VolumeRenderer();
+
+    this.#volumeRenderer.rotateX(10);
     this.#scene.add(this.#volumeRenderer);
 
     const uniforms = this.#volumeRenderer.uniforms;
     uniforms.depthTexture.value = this.#renderTarget.depthTexture;
     uniforms.volumeSize.value.set(2, 2, 2);
-    uniforms.clipMin.value.set(-1, -1, -1);
-    uniforms.clipMax.value.set(1, 1, 1);
+    //uniforms.clipMin.value.set(-1, -1, -1);
+    //uniforms.clipMax.value.set(1, 1, 1);
     uniforms.valueAdded.value = 0.3;
 
     // Create a lil.GUI
@@ -285,10 +287,10 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
           new THREE.Vector3(resolution, resolution, resolution),
           new THREE.Vector3(-1, -1, -1),
           new THREE.Vector3(2 / resolution, 2 / resolution, 2 / resolution),
-          1
+          1,
         );
         this.#volumeRenderer.updateAtlasTexture(
-          (xi, yi, zi, x, y, z, t) => sampler(x, y, z) + 1
+          (xi, yi, zi, x, y, z, t) => sampler(x, y, z) + 1,
         );
       },
     };
@@ -337,21 +339,21 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
       const physicalSize = new THREE.Vector3(
         size[1] * header.pixDims[1],
         size[2] * header.pixDims[2],
-        size[3] * header.pixDims[3]
+        size[3] * header.pixDims[3],
       );
       const scale =
         2 / Math.max(physicalSize.x, physicalSize.y, physicalSize.z);
       const voxelSize = new THREE.Vector3(
         header.pixDims[1] * scale,
         header.pixDims[2] * scale,
-        header.pixDims[3] * scale
+        header.pixDims[3] * scale,
       );
 
       this.#volumeRenderer.createAtlasTexture(
         new THREE.Vector3(size[1], size[3], size[2]),
         new THREE.Vector3(-1, -1, -1),
         new THREE.Vector3(voxelSize.y, voxelSize.z, voxelSize.x),
-        timeCount
+        timeCount,
       );
 
       const max = volume.reduce((a, x) => Math.max(a, slope * x + inter), 1e-6);
@@ -374,7 +376,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
       this.#timescale.value =
         timeCount === 1
           ? 0
-          : 1 / (header.pixDims[4] === 0 ? 1 : header.pixDims[4] ?? 1);
+          : 1 / (header.pixDims[4] === 0 ? 1 : (header.pixDims[4] ?? 1));
       this.#timeElement.max(this.#timeRange.value);
       timescaleElement.updateDisplay();
       timeRangeElement.updateDisplay();
@@ -419,7 +421,10 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
           }
           const merged = BufferGeometryUtils.mergeVertices(geometry);
           samplers.push(
-            VolumeSamplers.createGeometrySdfSampler(merged, new THREE.Matrix4())
+            VolumeSamplers.createGeometrySdfSampler(
+              merged,
+              new THREE.Matrix4(),
+            ),
           );
         }
       });
@@ -429,13 +434,13 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
         new THREE.Vector3(resolution, resolution, resolution),
         new THREE.Vector3(-1, -1, -1),
         new THREE.Vector3(2 / resolution, 2 / resolution, 2 / resolution),
-        1
+        1,
       );
 
       this.#volumeRenderer.updateAtlasTexture((xi, yi, zi, x, y, z, t) => {
         return samplers.reduce(
           (v, sampler) => Math.min(v, sampler(x, y, z) + 1),
-          Infinity
+          Infinity,
         );
       });
     };
@@ -486,7 +491,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
             niftiInput.click();
           },
         },
-        "load"
+        "load",
       )
       .name("Load NIfTI file").domElement.title =
       "Load 4D volume from NIfTI file.";
@@ -501,7 +506,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
             objInput.click();
           },
         },
-        "load"
+        "load",
       )
       .name("Load OBJ file").domElement.title =
       "Load and sample a mesh from an OBJ file.";
@@ -525,12 +530,12 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
       valueAddedElement.updateDisplay();
 
       if (use) {
-        this.#volumeRenderer.createAtlasTexture(
+        /* this.#volumeRenderer.createAtlasTexture(
           new THREE.Vector3(2, 2, 2),
           new THREE.Vector3(-1, -1, -1),
           new THREE.Vector3(2, 2, 2),
-          1
-        );
+          1,
+        );*/
         options.customFunction = glslTextarea.value;
       } else {
         options.customFunction = null;
@@ -600,7 +605,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
           uniforms.palette.value = texture;
 
           this.#volumeRenderer.material.needsUpdate = true;
-        }
+        },
       );
     };
     setPalette(palettes[0]);
@@ -833,8 +838,8 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
       1,
       Math.max(
         1e-6,
-        this.#lastTime === null ? 0 : (time - this.#lastTime) / 1000
-      )
+        this.#lastTime === null ? 0 : (time - this.#lastTime) / 1000,
+      ),
     );
     this.#lastTime = time;
 
@@ -843,7 +848,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
       Math.floor(
         ((this.#time.value + dt * this.#timescale.value) %
           this.#timeRange.value) *
-          10000
+          10000,
       ) / 10000;
     this.#timeElement.updateDisplay();
     this.#volumeRenderer.uniforms.time.value = this.#time.value;
@@ -853,7 +858,7 @@ return 0.5 * log(r) * r / dr * 10.0 + 1.0;
     this.#pointLight.position.set(
       Math.sin(time * 0.001) * 1.5,
       0.5,
-      Math.cos(time * 0.001) * 1.5
+      Math.cos(time * 0.001) * 1.5,
     );
 
     // Update camera controls

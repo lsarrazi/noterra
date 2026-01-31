@@ -1,4 +1,10 @@
-import { Pane } from "tweakpane";
+import { FolderApi, Pane } from "tweakpane";
+import { ObjectsRegistry, TraitTupleToInstanceIntersection } from "../core/ObjectsRegistry";
+import { CameraObservable } from "../traits/CameraObservable";
+import { GuiConfigurable } from "../traits/GuiConfigurable";
+import _ from "lodash";
+import { Trait } from "../traits";
+import { Vector2, Vector3, Vector4 } from "three";
 
 // Declarative, lazy GUI builder for Tweakpane.
 // Schema entries: { key, label, type: 'toggle'|'slider'|'readonly', min, max, step, get, set, format }
@@ -30,14 +36,15 @@ type ReadonlyEntry = {
     format?: (v: unknown) => string;
 };
 
-type ObjectSelectEntry = {
+type ObjectSelectEntry<Traits extends Trait[], T = TraitTupleToInstanceIntersection<Traits>> = Traits extends infer R ? {
     type: "object-select";
     key?: string;
     label?: string;
-    filter?: (o: GuiObject) => boolean;
-    get?: () => string | null | undefined;
-    set?: (v: string | null | undefined) => void;
-};
+    traits: [...Traits];
+    filter?: (object: Traits) => boolean;
+    get?: () => T | undefined;
+    set?: (object: T) => void;
+} : never;
 
 type ColorEntry = {
     type: "color";
@@ -45,6 +52,14 @@ type ColorEntry = {
     label?: string;
     get?: () => string;
     set?: (v: string) => void;
+};
+
+type VectorEntry = {
+    type: "vector";
+    key?: string;
+    label?: string;
+    get?: () => Vector2 | Vector3 | Vector4;
+    set?: (v: Vector2 | Vector3 | Vector4) => void;
 };
 
 type FolderEntry = {
@@ -58,9 +73,11 @@ type GuiSchemaEntry =
     | ToggleEntry
     | SliderEntry
     | ReadonlyEntry
-    | ObjectSelectEntry
+    | ObjectSelectEntry<any>
     | ColorEntry
-    | FolderEntry;
+    | FolderEntry
+    | VectorEntry
+    ;
 
 type GuiTab = {
     id: string;
@@ -68,13 +85,7 @@ type GuiTab = {
     schema: GuiSchemaEntry[];
 };
 
-type GuiTabs = { tabs: GuiTab[] };
-
-type GuiObject = {
-    id: string;
-    label: string;
-    getGuiSchema?: () => GuiTabs | null | undefined;
-};
+export type GuiTabs = { tabs: GuiTab[] };
 
 type ControlRecord = {
     controller?: { dispose?: () => void; refresh?: () => void } | null;
@@ -91,7 +102,7 @@ export default class GuiManager {
     currentObjectId: string | null;
     objectControls: ControlRecord[];
     globalsControls: ControlRecord[];
-    objectsRegistry: GuiObject[];
+    objectsRegistry: ObjectsRegistry;
     selectorBinding: any;
     filterBinding: any;
     propertyFilters: Record<string, string>;
@@ -104,6 +115,7 @@ export default class GuiManager {
         this.globalsContainer.style.left = "12px";
         this.globalsContainer.style.top = "12px";
         this.globalsContainer.style.zIndex = "10";
+        this.globalsContainer.style.width = "400px";
         document.body.appendChild(this.globalsContainer);
 
         this.objectsContainer = document.createElement("div");
@@ -111,6 +123,7 @@ export default class GuiManager {
         this.objectsContainer.style.right = "12px";
         this.objectsContainer.style.top = "12px";
         this.objectsContainer.style.zIndex = "10";
+        this.objectsContainer.style.width = "400px";
         document.body.appendChild(this.objectsContainer);
 
         this.globalsPane = new Pane({
@@ -124,7 +137,6 @@ export default class GuiManager {
         this.currentObjectId = null;
         this.objectControls = [];
         this.globalsControls = [];
-        this.objectsRegistry = [];
         this.selectorBinding = null;
         this.filterBinding = null;
         this.propertyFilters = {};
@@ -143,9 +155,9 @@ export default class GuiManager {
         this.buildControls(this.globalsPane, schema, this.globalsControls);
     }
 
-    setObjectsRegistry(objects: GuiObject[] = []): void {
+    setObjectsRegistry(objectsRegistry: ObjectsRegistry): void {
         if (!this.objectsPane) return;
-        this.objectsRegistry = objects;
+        this.objectsRegistry = objectsRegistry;
         if (this.selectorBinding) {
             this.selectorBinding.dispose();
             this.selectorBinding = null;
@@ -155,14 +167,16 @@ export default class GuiManager {
             this.tabView = null;
         }
 
-        const state = { selected: objects[0]?.id ?? null };
 
-        const options = objects.reduce<Record<string, string>>((acc, obj) => {
-            acc[obj.label] = obj.id;
-            return acc;
-        }, {});
+        const filtered = this.objectsRegistry.getObjectsByTraits(GuiConfigurable);
 
-        if (objects.length > 0) {
+        const state = { selected: this.objectsRegistry.getObjectId(filtered[0]) ?? null };
+
+
+        const options = _.zipObject(_.map(filtered, o => this.objectsRegistry.getObjectLabel(o)), _.map(filtered, o => this.objectsRegistry.getObjectId(o)));
+
+        console.log("Object options:", options);
+        if (filtered.length > 0) {
             this.selectorBinding = this.objectsPane
                 .addBinding(state, "selected", { label: "Select object", options })
                 .on("change", (ev: { value: string | null }) => {
@@ -198,11 +212,12 @@ export default class GuiManager {
         this.objectControls.forEach((c) => c.controller?.dispose());
         this.objectControls = [];
 
-        const obj = this.objectsRegistry.find((o) => o.id === objectId);
+        const obj = this.objectsRegistry.getObjectById(objectId) as GuiConfigurable | null;
         if (!obj) return;
 
-        const schema = obj.getGuiSchema ? obj.getGuiSchema() : null;
+        const schema = obj.getGuiSchema();
         const tabs = schema?.tabs ?? [];
+        console.log("Building GUI for object:", objectId, obj, tabs);
         const filterText = (this.propertyFilters[objectId] ?? "").trim();
         const filterState = { value: this.propertyFilters[objectId] ?? "" };
         if (this.filterBinding) {
@@ -241,7 +256,8 @@ export default class GuiManager {
             this.tabView = null;
         }
         if (!this.currentObjectId) return;
-        const obj = this.objectsRegistry.find((o) => o.id === this.currentObjectId);
+        const obj = this.objectsRegistry.getObjectById(this.currentObjectId);
+        console.log("Rebuilding GUI for object:", this.currentObjectId, obj);
         if (!obj) return;
         this.buildObjectControls(this.currentObjectId);
     }
@@ -277,16 +293,32 @@ export default class GuiManager {
         return out;
     }
 
+    formatNumber(value: unknown): string {
+        if (typeof value === "number") {
+            const absValue = Math.abs(value);
+            if (absValue >= 1e3 || absValue <= 1e-3 && value !== 0) {
+                return value.toExponential(3);
+            } else {
+                return value.toPrecision(4);
+            }
+        }
+        return value?.toString() ?? "";
+    }
+
     private buildControls(
-        folder: any,
+        folder: FolderApi,
         schema: GuiSchemaEntry[],
         store: ControlRecord[]
     ): void {
         schema.forEach((entry) => {
-            const { label, type, min, max, step, get, set, format, filter } = entry as any;
+            const { label, type, min, max, step, get, set, filter, traits } = entry as any;
+
             const state = { value: get ? get() : undefined };
             let controller: any = null;
-            if (type === "toggle") {
+            if (type === "vector") {
+                controller = folder.addBinding(state, "value", { label });
+            }
+            else if (type === "toggle") {
                 controller = folder
                     .addBinding(state, "value", { label })
                     .on("change", (ev: { value: unknown }) => set && set(!!ev.value));
@@ -295,24 +327,27 @@ export default class GuiManager {
                     .addBinding(state, "value", { label, min, max, step })
                     .on("change", (ev: { value: number }) => set && set(ev.value));
             } else if (type === "readonly") {
-                const bindingOpts: Record<string, unknown> = { label, readonly: true };
-                if (format) bindingOpts.format = format;
+                const bindingOpts: Record<string, unknown> = { label, readonly: true, format: this.formatNumber };
+
                 controller = folder.addBinding(state, "value", bindingOpts);
             } else if (type === "object-select") {
-                const filtered = this.objectsRegistry.filter((o) =>
-                    typeof filter === "function" ? filter(o) : true
-                );
-                const options = filtered.reduce<Record<string, string>>((acc, obj) => {
-                    acc[obj.label] = obj.id;
-                    return acc;
-                }, {});
-                if (Object.keys(options).length === 0) return;
+                const filtered = this.objectsRegistry.getObjectsByTraits.apply(this.objectsRegistry, traits);
+                const valueObject = state.value;
+
+                state.value = this.objectsRegistry.getObjectId(get());
+
+                console.log('Get() valueObject:', valueObject, state.value);
+                const options = _.zipObject(_.map(filtered, o => this.objectsRegistry.getObjectLabel(o)), _.map(filtered, o => this.objectsRegistry.getObjectId(o)));
+
+                if (_.keys(options).length === 0) return;
                 if (!state.value || !Object.values(options).includes(state.value as string)) {
-                    state.value = Object.values(options)[0];
+                    state.value = this.objectsRegistry.getObjectId(Object.values(options)[0]);
                 }
                 controller = folder
                     .addBinding(state, "value", { label, options })
-                    .on("change", (ev: { value: string }) => set && set(ev.value));
+                    .on("change", (ev: { value: string }) => set && (console.log("Object-select changed:", ev.value), set(this.objectsRegistry.getObjectById(ev.value))));
+                store.push({ controller, get: () => this.objectsRegistry.getObjectId(get()), set, state });
+                return;
             } else if (type === "color") {
                 controller = folder
                     .addBinding(state, "value", { label, view: "color" })

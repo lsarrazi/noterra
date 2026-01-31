@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@tweakpane/core": "^2.0.5",
+    "@types/lodash": "^4.17.23",
+    "@types/three": "^0.182.0",
     "http-server": "^14.1.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.10"
@@ -16,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "lodash": "^4.17.21",
     "three": "^0.182.0",
     "tweakpane": "^4.0.5"
   }

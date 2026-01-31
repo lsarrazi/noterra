@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { planetSurfaceConfig } from "../config";
 import Atmosphere from "../atmosphere/Atmosphere";
+import { CameraObservable } from "../traits/CameraObservable";
+import { GuiConfigurable } from "../traits/GuiConfigurable";
+import { SpacetimeEntity } from "../spacetime/SpacetimeEntity";
 
 type PlanetViewUniforms = {
     uTime: { value: number };
@@ -35,7 +38,7 @@ type GuiTab = { id: string; label: string; schema: GuiSchemaEntry[] };
 
 type GuiTabs = { tabs: GuiTab[] };
 
-export default class PlanetView {
+export default class PlanetView implements GuiConfigurable, CameraObservable, SpacetimeEntity {
     axialTiltDeg: number;
     atmosphere: Atmosphere;
     cameraPrefs: { trackRotation: boolean; minDistance: number; maxDistance: number };
@@ -79,6 +82,9 @@ export default class PlanetView {
             uShowGrid: { value: 0.0 },
             uGridStrength: { value: planetSurfaceConfig.gridStrength },
             uGridColor: { value: new THREE.Color(planetSurfaceConfig.gridColor) },
+            uPlateCount: { value: 48 },
+            uPlateSpeed: { value: 0.02 },
+            uPlateContrast: { value: 0.3 },
         };
 
         this.baseGridWidth = 0.02;
@@ -211,8 +217,27 @@ export default class PlanetView {
 
         this.currentRotation = new THREE.Quaternion();
 
+        // Initialize spacetime state with default values
+        this.spacetimeState = {
+            time: 0,
+            tau: 0,
+            position: new THREE.Vector3(0, 0, 0),
+            velocity: new THREE.Vector3(0, 0, 0),
+        };
+
         this.group = new THREE.Group();
+        this.group.add(this.atmosphere.volumeRenderer);
         this.group.add(this.mesh);
+    }
+
+    getRestMass(): number { return 5.972e24; }
+
+    getGravitySource() {
+        return {
+            kind: "point",
+            mass: 5.972,
+            epsilon: 0.1,
+        } as const;
     }
 
     setScale(v: number): void {
@@ -264,12 +289,24 @@ export default class PlanetView {
         this.setGridWidth(width);
     }
 
+    private spacetimeState: { time: number; tau: number; position: THREE.Vector3; velocity: THREE.Vector3; };
+
+    onSpacetimeTick(state: { time: number; tau: number; position: THREE.Vector3; velocity: THREE.Vector3; }): void {
+        //this.group.position.copy(state.position);
+        this.spacetimeState = state;
+    }
+
     update(time: number, dt = 0.016): void {
         if (this.uniforms?.uTime) {
             this.uniforms.uTime.value = time;
         }
         this.updateRotationAngle(time);
-        this.atmosphere?.update(time);
+        this.group.position.copy(this.spacetimeState.position.clone().add(this.spacetimeState.velocity.clone().multiplyScalar(time - this.spacetimeState.time)));
+
+    }
+
+    render(time: number, camera: THREE.PerspectiveCamera) {
+        this.atmosphere.render(time, camera, this.group.position, this.currentRotation);
     }
 
     updateRotationAngle(time: number): void {
@@ -486,7 +523,8 @@ export default class PlanetView {
             maxDistance: this.cameraPrefs.maxDistance,
             trackRotation: this.cameraPrefs.trackRotation,
             getObjectRotation: () => this.currentRotation,
-        };
+            getObjectPosition: () => this.group.position,
+        } as const;
     }
 
     getAtmosphereObject(): THREE.Object3D | null {

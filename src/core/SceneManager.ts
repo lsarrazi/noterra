@@ -10,6 +10,7 @@ export default class SceneManager {
         this.renderer = new THREE.WebGLRenderer({
             canvas,
             logarithmicDepthBuffer: rendererConfig.logarithmicDepthBuffer,
+            antialias: true,
         });
         // Ensure pixel-store flags are safe for 3D textures globally
         const gl = this.renderer.getContext();
@@ -45,6 +46,7 @@ export default class SceneManager {
     }
 
     render(): void {
+        this.renderer.setRenderTarget(null);
         this.renderer.render(this.scene, this.camera);
     }
 }

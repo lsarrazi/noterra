@@ -4,6 +4,11 @@ import CameraRig from "./camera/CameraRig";
 import PlanetView from "./planet/PlanetView";
 import GuiManager from "./ui/GuiManager";
 import { planetSurfaceConfig } from "./config";
+import { GuiConfigurable } from "./traits/GuiConfigurable";
+import { CameraObservable } from "./traits/CameraObservable";
+import { ObjectsRegistry } from "./core/ObjectsRegistry";
+import StarView from "./planet/StarView";
+import { SpacetimeManifold } from "./spacetime/SpacetimeManifold";
 
 export default class PlanetApp {
     static _init(): void {
@@ -15,18 +20,21 @@ export default class PlanetApp {
     sceneManager: SceneManager;
     guiManager: GuiManager | null;
     cameraRig: CameraRig;
-    planetSurface: PlanetView;
-    objectsRegistry: Array<{
-        id: string;
-        label: string;
-        object: unknown;
-        getGuiSchema: () => unknown;
-    }>;
+    planet: PlanetView;
+    spacetimeManifold = new SpacetimeManifold({
+        c: 299792458,
+        G: 6.67430e-11,
+        enableProperTime: true,
+        enableSoftening: true,
+    });
+    star: StarView;
+    objectsRegistry: ObjectsRegistry;
     lastTime: number | null;
     time: number;
 
     constructor() {
         const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+
         this.sceneManager = new SceneManager(canvas ?? undefined);
         this.sceneManager.setBackground(0x000020);
         this.guiManager = null;
@@ -39,14 +47,17 @@ export default class PlanetApp {
             this.sceneManager.camera,
             this.sceneManager.renderer.domElement
         );
-        this.planetSurface = new PlanetView(planetSurfaceConfig);
+        this.planet = new PlanetView(planetSurfaceConfig);
+        this.star = new StarView();
 
-        this.objectsRegistry = [
+        this.objectsRegistry = new ObjectsRegistry();
+
+        [
             {
                 id: "planet",
                 label: "Planet",
-                object: this.planetSurface,
-                getGuiSchema: () => this.planetSurface.getGuiSchema(),
+                object: this.planet,
+                getGuiSchema: () => this.planet.getGuiSchema(),
             },
             {
                 id: "camera",
@@ -56,23 +67,55 @@ export default class PlanetApp {
             },
         ];
 
-        this.cameraRig.setObjectResolver((id) => {
-            const entry = this.objectsRegistry.find((o) => o.id === id);
-            return (entry?.object as THREE.Object3D | null) ?? null;
+        this.objectsRegistry.registerTrait({ trait: GuiConfigurable, description: "Objects that provide a GUI schema" });
+        this.objectsRegistry.registerTrait({ trait: CameraObservable, description: "Objects that provide camera configuration" });
+
+        this.objectsRegistry.register({
+            label: "Scene",
+            object: this.sceneManager,
+            traits: []
         });
-        this.cameraRig.setObservableById("planet");
 
-        // Lights
-        this.sceneManager.add(new THREE.DirectionalLight(0xffffff, 5));
-        this.sceneManager.add(new THREE.AmbientLight(0x404040, 2));
+        this.objectsRegistry.register({
+            label: "Camera Rig",
+            object: this.cameraRig,
+            traits: [GuiConfigurable]
+        });
 
-        // Scene content
-        const atmosphereObj = this.planetSurface.getAtmosphereObject();
-        if (atmosphereObj) {
-            this.sceneManager.add(atmosphereObj);
-        }
-        this.sceneManager.add(this.planetSurface.group);
-        this.sceneManager.add(this.planetSurface.axisHelper);
+        this.objectsRegistry.register({
+            label: "Planet Noterra",
+            object: this.planet,
+            traits: [GuiConfigurable, CameraObservable]
+        });
+
+        this.objectsRegistry.register({
+            label: "Angelad",
+            object: this.star,
+            traits: [GuiConfigurable, CameraObservable]
+        })
+
+        this.objectsRegistry.register({
+            label: "Spacetime Manifold",
+            object: this.spacetimeManifold,
+            traits: [GuiConfigurable]
+        });
+
+
+        this.cameraRig.setObservable(this.planet);
+
+        this.sceneManager.add(this.planet.group);
+        this.sceneManager.add(this.planet.axisHelper);
+        this.sceneManager.add(this.star.group);
+
+        this.spacetimeManifold.register(this.planet, {
+            x: new THREE.Vector3(0, 0, 0),
+            v: new THREE.Vector3(0, .4, 0),
+        });
+
+        this.spacetimeManifold.register(this.star, {
+            x: new THREE.Vector3(10, 0, 0),
+            v: new THREE.Vector3(0, 0, 0),
+        });
 
         window.addEventListener("resize", () => this.handleResize());
         this.handleResize();
@@ -107,17 +150,25 @@ export default class PlanetApp {
         }
         this.lastTime = now;
 
-        // Updates
-        this.cameraRig.updateZoom(this.sceneManager.camera, frameDt);
-        this.cameraRig.updateRotateSpeed(this.sceneManager.camera);
+        this.spacetimeManifold.step(frameDt);
 
-        this.planetSurface.updateGridWidthForCamera(
+
+
+
+        this.planet.updateGridWidthForCamera(
             this.sceneManager.camera,
             this.sceneManager.renderer.domElement?.height ?? 1
         );
-        this.planetSurface.update(this.time, frameDt);
+        this.planet.update(this.time, frameDt);
 
-        this.cameraRig.update(this.sceneManager.camera);
+        this.star.update(this.time, frameDt);
+
+        // Update camera first to get final position/rotation
+        this.cameraRig.update(this.sceneManager.camera, frameDt);
+
+        this.planet.render(this.time, this.sceneManager.camera);
+        this.star.render(this.time, this.sceneManager.camera);
+
         this.guiManager?.refresh();
 
         this.sceneManager.render();

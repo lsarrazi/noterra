@@ -3,7 +3,7 @@ export const cameraConfig = {
     fov: 75,
     aspect: 1,
     near: 0.00001,
-    far: 10,
+    far: 200,
 };
 
 export const rendererConfig = {
@@ -41,7 +41,7 @@ export const planetSurfaceConfig = {
 };
 
 export const atmosphereConfig = {
-    raySteps: 256,
+    raySteps: 128,
     extinctionMultiplier: 1.0,
     alphaMultiplier: 1.0,
 };

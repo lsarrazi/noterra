@@ -2,20 +2,32 @@ import * as THREE from "three";
 
 const vertexShader = `
 varying vec2 vUv;
-varying float near;
-varying float far;
-varying mat4 invProjView;
+varying vec3 vFarWorld;
+
+// Far plane corners in world space (computed on CPU for precision)
+uniform vec3 farTopLeft;
+uniform vec3 farTopRight;
+uniform vec3 farBottomLeft;
+uniform vec3 farBottomRight;
 
 void main() {
     // Fullscreen quad
     gl_Position = vec4(position.xy, 0.0, 1.0);
     vUv = uv;
-    near = projectionMatrix[3][2] / (projectionMatrix[2][2] - 1.0);
-    far = projectionMatrix[3][2] / (projectionMatrix[2][2] + 1.0);
-    invProjView = inverse(projectionMatrix * viewMatrix);
+    
+    // Bilinear interpolation of far plane corners
+    vec3 top = mix(farTopLeft, farTopRight, uv.x);
+    vec3 bottom = mix(farBottomLeft, farBottomRight, uv.x);
+    vFarWorld = mix(bottom, top, uv.y);
 }`;
 
 const fragmentShader = `
+#if USE_VOLUMETRIC_DEPTH_TEST
+// Camera near and far planes for depth reconstruction
+uniform float near;
+uniform float far;
+#endif
+
 #if RENDER_MEAN_VALUE == 0 && (USE_POINT_LIGHTS || USE_DIR_LIGHTS) || RENDER_NORMALS
 // The real-unit epsilon used when estimating the forward difference for normals
 uniform float normalEpsilon;
@@ -70,9 +82,15 @@ uniform sampler2D depthTexture;
 
 // The world-space origin of the volume
 uniform vec3 volumeOrigin;
+// The world-space position of the volume
+uniform vec3 volumePosition;
+// Transform matrices for the volume
+uniform mat4 volumeMatrix;
+uniform mat4 volumeInverseMatrix;
 #if USE_CUSTOM_VALUE_FUNCTION
 // The world-space size of the volume
 uniform vec3 volumeSize;
+varying float worldRayDirection;
 
 // The injected function sampling a value from a position + time
 float sampleValue(float x, float y, float z, float t) {
@@ -130,18 +148,16 @@ uniform DirectionalLight directionalLights[NUM_DIR_LIGHTS];
 #endif
 
 varying vec2 vUv;
-varying float near;
-varying float far;
-varying mat4 invProjView;
+varying vec3 vFarWorld;
 
 void main() {
-    // Calculate the world position of the far plane using the plane UV coordinate
-    vec4 farWorld = invProjView * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
-    farWorld /= farWorld.w;
-
-    // Cast a ray from the camera to the near plane
-    vec3 rayOrigin = cameraPosition;
-    vec3 rayDirection = normalize(farWorld.xyz - rayOrigin);
+    // Cast a ray from the camera to the far plane (in world space)
+    vec3 worldRayOrigin = cameraPosition;
+    vec3 worldRayDirection = normalize(vFarWorld - worldRayOrigin);
+    
+    // Transform ray into volume local space
+    vec3 rayOrigin = (volumeInverseMatrix * vec4(worldRayOrigin, 1.0)).xyz;
+    vec3 rayDirection = normalize((volumeInverseMatrix * vec4(worldRayDirection, 0.0)).xyz);
 
 #if USE_VOLUMETRIC_DEPTH_TEST
     // Sample depth
@@ -297,15 +313,29 @@ void main() {
         // Sum up lighting
         vec3 addedLights = vec3(0.0);
 
+        // Transform volume local position back to world space for lighting
+        vec3 worldPosition = (volumeMatrix * vec4(position, 1.0)).xyz;
         // Transform world position and normal into view space
-        vec3 viewPosition = (viewMatrix * vec4(position, 1.0)).xyz;
-        vec3 viewNormal = normalize((viewMatrix * vec4(normal, 0.0)).xyz);
+        vec3 viewPosition = (viewMatrix * vec4(worldPosition, 1.0)).xyz;
+        // Transform volume local normal to world space, then to view space
+        vec3 worldNormal = normalize((volumeMatrix * vec4(normal, 0.0)).xyz);
+        vec3 viewNormal = normalize((viewMatrix * vec4(worldNormal, 0.0)).xyz);
 
    #if USE_POINT_LIGHTS && NUM_POINT_LIGHTS > 0
         for(int l = 0; l < NUM_POINT_LIGHTS; l++) {
             vec3 lightDirection = normalize(pointLights[l].position - viewPosition);
-            float strength = max(1.0 - (distance(viewPosition, pointLights[l].position) / pointLights[l].distance), 0.0);
-            addedLights += clamp(dot(lightDirection, viewNormal), 0.0, 1.0) * pointLights[l].color * strength;
+            float dist = distance(viewPosition, pointLights[l].position);
+            
+            // Physical attenuation (inverse square law) with distance cutoff
+            float attenuation = 1.0;
+            if (pointLights[l].distance > 0.0) {
+                // Smooth cutoff at the light's max distance
+                float cutoff = max(0.0, 1.0 - (dist / pointLights[l].distance));
+                // Inverse square with minimum distance to avoid division by very small numbers
+                attenuation = cutoff / max(dist * dist, 0.01);
+            }
+            
+            addedLights += clamp(dot(lightDirection, viewNormal), 0.0, 1.0) * pointLights[l].color * attenuation;
         }
    #endif
    #if USE_DIR_LIGHTS && NUM_DIR_LIGHTS > 0
@@ -463,10 +493,19 @@ void main() {
 
 export default class VolumeRenderer extends THREE.Mesh {
   uniforms = {
+    farTopLeft: { value: new THREE.Vector3() },
+    farTopRight: { value: new THREE.Vector3() },
+    farBottomLeft: { value: new THREE.Vector3() },
+    farBottomRight: { value: new THREE.Vector3() },
+    near: { value: 0.1 },
+    far: { value: 1000.0 },
     depthTexture: { value: null },
 
     volumeOrigin: { value: new THREE.Vector3() },
     volumeSize: { value: new THREE.Vector3() },
+    volumePosition: { value: new THREE.Vector3() },
+    volumeMatrix: { value: new THREE.Matrix4() },
+    volumeInverseMatrix: { value: new THREE.Matrix4() },
 
     volumeAtlas: { value: null },
     atlasResolution: { value: new THREE.Vector3() },
@@ -502,9 +541,47 @@ export default class VolumeRenderer extends THREE.Mesh {
     this.name = "VolumeRenderer";
 
     // Render the volume late as it acts as a postprocessing effect
-    this.renderOrder = 1000;
+    //this.renderOrder = -1;
+
+    // Never cull this fullscreen quad
+    this.frustumCulled = false;
 
     this.updateMaterial();
+  }
+
+  /**
+   * Updates camera-related uniforms including the inverse projection-view matrix.
+   * This should be called before rendering to ensure proper precision with extreme near/far values.
+   *
+   * @param {THREE.PerspectiveCamera} camera - The camera to compute matrices from.
+   */
+  updateCameraUniforms(camera) {
+    // Compute far plane corners in world space on CPU with double precision
+    // This avoids precision issues from matrix operations in the shader
+    const invProjView = new THREE.Matrix4();
+    invProjView
+      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      .invert();
+
+    // Compute the four corners of the far plane in world space
+    const corners = [
+      new THREE.Vector3(-1, -1, 1), // bottom-left
+      new THREE.Vector3(1, -1, 1), // bottom-right
+      new THREE.Vector3(-1, 1, 1), // top-left
+      new THREE.Vector3(1, 1, 1), // top-right
+    ];
+
+    corners.forEach((corner) => {
+      corner.applyMatrix4(invProjView);
+    });
+
+    this.uniforms.farBottomLeft.value.copy(corners[0]);
+    this.uniforms.farBottomRight.value.copy(corners[1]);
+    this.uniforms.farTopLeft.value.copy(corners[2]);
+    this.uniforms.farTopRight.value.copy(corners[3]);
+
+    this.uniforms.near.value = camera.near;
+    this.uniforms.far.value = camera.far;
   }
 
   /**
@@ -549,7 +626,18 @@ export default class VolumeRenderer extends THREE.Mesh {
     const uniforms = lights
       ? THREE.UniformsUtils.merge([THREE.UniformsLib["lights"], {}])
       : {};
+    uniforms.farTopLeft = this.uniforms.farTopLeft;
+    uniforms.farTopRight = this.uniforms.farTopRight;
+    uniforms.farBottomLeft = this.uniforms.farBottomLeft;
+    uniforms.farBottomRight = this.uniforms.farBottomRight;
+    if (defines.USE_VOLUMETRIC_DEPTH_TEST) {
+      uniforms.near = this.uniforms.near;
+      uniforms.far = this.uniforms.far;
+    }
     uniforms.volumeOrigin = this.uniforms.volumeOrigin;
+    uniforms.volumePosition = this.uniforms.volumePosition;
+    uniforms.volumeMatrix = this.uniforms.volumeMatrix;
+    uniforms.volumeInverseMatrix = this.uniforms.volumeInverseMatrix;
     uniforms.time = this.uniforms.time;
     uniforms.random = this.uniforms.random;
     uniforms.minCutoffValue = this.uniforms.minCutoffValue;
@@ -633,18 +721,18 @@ export default class VolumeRenderer extends THREE.Mesh {
     volumeOrigin,
     voxelSize,
     timeCount,
-    textureFilter = THREE.LinearFilter
+    textureFilter = THREE.LinearFilter,
   ) {
     // Calculate how many volumes to pack into the texture atlas
     const atlasResolutionX = Math.ceil(Math.pow(timeCount, 1 / 3));
     const atlasResolutionY = atlasResolutionX;
     const atlasResolutionZ = Math.ceil(
-      timeCount / (atlasResolutionX * atlasResolutionY)
+      timeCount / (atlasResolutionX * atlasResolutionY),
     );
     const atlasResolution = new THREE.Vector3(
       atlasResolutionX,
       atlasResolutionY,
-      atlasResolutionZ
+      atlasResolutionZ,
     );
 
     // Calculate atlas size in voxels
@@ -661,7 +749,7 @@ export default class VolumeRenderer extends THREE.Mesh {
       voxels,
       textureSizeX,
       textureSizeY,
-      textureSizeZ
+      textureSizeZ,
     );
     texture.format = THREE.RedFormat;
     texture.type = THREE.HalfFloatType;
@@ -744,7 +832,7 @@ export default class VolumeRenderer extends THREE.Mesh {
       const volumeIndexX = t % atlasResolutionX;
       const volumeIndexY = Math.floor(t / atlasResolutionX) % atlasResolutionY;
       const volumeIndexZ = Math.floor(
-        t / (atlasResolutionX * atlasResolutionY)
+        t / (atlasResolutionX * atlasResolutionY),
       );
 
       // Iterate voxels
@@ -759,7 +847,7 @@ export default class VolumeRenderer extends THREE.Mesh {
               xi * voxelSizeX + volumeOriginX,
               yi * voxelSizeY + volumeOriginY,
               zi * voxelSizeZ + volumeOriginZ,
-              t
+              t,
             );
 
             minValue = Math.min(minValue, value);
