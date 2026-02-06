@@ -179,12 +179,15 @@ export class SpacetimeManifold
         for (let i = 0; i < this.entities.length; i++) {
             const entity = this.entities[i];
             const state = this.states[i];
-            entity.onSpacetimeTick?.({
+            const newState = {
                 time: state.t,
                 tau: state.tau,
                 position: state.x.clone(),
                 velocity: state.v.clone(),
-            });
+            };
+
+            entity.spacetimeState = newState;
+            entity.onSpacetimeTick?.(newState);
         }
     }
 

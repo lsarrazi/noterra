@@ -13,7 +13,8 @@ import { SpacetimeManifold } from "./spacetime/SpacetimeManifold";
 export default class PlanetApp {
     static _init(): void {
         window.addEventListener("load", () => {
-            new PlanetApp();
+            window["app"] = new PlanetApp();
+            window["app"].animate();
         });
     }
 
@@ -51,21 +52,6 @@ export default class PlanetApp {
         this.star = new StarView();
 
         this.objectsRegistry = new ObjectsRegistry();
-
-        [
-            {
-                id: "planet",
-                label: "Planet",
-                object: this.planet,
-                getGuiSchema: () => this.planet.getGuiSchema(),
-            },
-            {
-                id: "camera",
-                label: "Camera",
-                object: this.cameraRig,
-                getGuiSchema: () => this.cameraRig.getGuiSchema(),
-            },
-        ];
 
         this.objectsRegistry.registerTrait({ trait: GuiConfigurable, description: "Objects that provide a GUI schema" });
         this.objectsRegistry.registerTrait({ trait: CameraObservable, description: "Objects that provide camera configuration" });
@@ -124,7 +110,6 @@ export default class PlanetApp {
 
         this.lastTime = null;
         this.time = 0;
-        this.animate();
     }
 
     #setupGui(): void {
@@ -152,9 +137,6 @@ export default class PlanetApp {
 
         this.spacetimeManifold.step(frameDt);
 
-
-
-
         this.planet.updateGridWidthForCamera(
             this.sceneManager.camera,
             this.sceneManager.renderer.domElement?.height ?? 1
@@ -172,5 +154,14 @@ export default class PlanetApp {
         this.guiManager?.refresh();
 
         this.sceneManager.render();
+    }
+
+    static getApp(): PlanetApp {
+        return window["app"];
+    }
+
+    getResolution(): { width: number; height: number } {
+        const { width, height } = this.sceneManager.renderer.domElement;
+        return { width, height };
     }
 }

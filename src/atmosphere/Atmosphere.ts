@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import VolumeRenderer from "../../VolumeRenderer";
 import { atmosphereConfig } from "../config";
+import PlanetApp from "../PlanetApp";
 
 type AtmosphereMaterialOptions = {
     customFunction: string;
@@ -58,11 +59,11 @@ export default class Atmosphere {
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Failed to get 2D context for atmosphere palette");
         const gradient = ctx.createLinearGradient(0, 0, 256, 0);
-        gradient.addColorStop(0.0, "rgba(250, 250, 250, 1.0)");  // vacuum
+        gradient.addColorStop(0.0, "rgba(0, 0, 0, 0.0)");  // vacuum
         gradient.addColorStop(0.25, "rgba(16, 60, 103, 0.15)"); // thin air
         gradient.addColorStop(0.6, "rgba(2, 135, 224, 0.35)"); // blue haze
         gradient.addColorStop(0.85, "rgba(200,220,230, 0.55)"); // horizon milk
-        gradient.addColorStop(0.98, "rgba(255, 255, 255, 1.0)"); // dense air
+        gradient.addColorStop(1.0, "rgba(255, 255, 255, 1.0)"); // dense air
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 256, 1);
         const paletteTexture = new THREE.CanvasTexture(canvas);
@@ -76,8 +77,8 @@ export default class Atmosphere {
     vec3 p = vec3(x, y, z) - vec3(1.0);
 float dist = length(p);
 if (dist > 0.6) { return 0.0; }
-if (dist < 0.5) { return 0.0; }
-return 1.0 - dist;
+if (dist < 0.49) { return 0.0; }
+return 1.0 - smoothstep(0.49, 0.6, dist);
 
 `;
 
@@ -104,31 +105,26 @@ return 1.0 - dist;
 
     render(time: number, camera?: THREE.PerspectiveCamera, planetPosition?: THREE.Vector3, planetRotation?: THREE.Quaternion): void {
         if (camera) {
+
             this.volumeRenderer.updateCameraUniforms(camera);
         }
 
         // Build volume transformation matrix from planet position and rotation
         if (planetPosition && planetRotation) {
 
-            // Build volume transformation matrix from planet position and rotation
-
-            const fovY = THREE.MathUtils.degToRad(camera.fov);
-            const fovX = 2 * Math.atan(Math.tan(fovY * 0.5) * camera.aspect);
-            const kx = 1 / Math.cos(fovX * 0.5);
-            const ky = 1 / Math.cos(fovY * 0.5);
-            // distorsion légère
-            const eps = 0.05;
-            const sx = THREE.MathUtils.lerp(1, kx, eps);
-            const sy = THREE.MathUtils.lerp(1, ky, eps);
-            const sz = 1;
-
             const volumeMatrix = new THREE.Matrix4();
-            volumeMatrix.compose(planetPosition, planetRotation, new THREE.Vector3(sy, sx, sz));
-
+            volumeMatrix.compose(planetPosition, planetRotation, new THREE.Vector3(1, 1, 1));
 
             this.volumeRenderer.uniforms.volumeMatrix.value.copy(volumeMatrix);
             this.volumeRenderer.uniforms.volumeInverseMatrix.value.copy(volumeMatrix).invert();
             this.volumeRenderer.uniforms.volumePosition.value.copy(planetPosition);
+
+
+            const resolution = PlanetApp.getApp().getResolution();
+            this.volumeRenderer.uniforms.resolution.value.set(
+                resolution.width,
+                resolution.height
+            );
         }
     }
 

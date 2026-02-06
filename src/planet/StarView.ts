@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CameraConfig, CameraObservable } from "../traits/CameraObservable";
 import { GuiConfigurable } from "../traits/GuiConfigurable";
-import { SpacetimeEntity } from "../spacetime/SpacetimeEntity";
+import { SpacetimeEntity, SpacetimeState } from "../spacetime/SpacetimeEntity";
 
 type StarViewUniforms = {
     uTime: { value: number };
@@ -39,6 +39,8 @@ export default class StarView implements
     mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
     group: THREE.Group;
     pointLight: THREE.PointLight;
+
+    spacetimeState: SpacetimeState;
 
     constructor(radius: number = 3) {
         const g = new THREE.SphereGeometry(radius, 128, 128);
@@ -195,6 +197,10 @@ export default class StarView implements
 
     onSpacetimeTick(state: { time: number; tau: number; position: THREE.Vector3; velocity: THREE.Vector3; }): void {
         this.group.position.copy(state.position);
+    }
+
+    getSpacetimeState(): SpacetimeState {
+        return this.spacetimeState;
     }
 
 

@@ -79,7 +79,7 @@ type GuiSchemaEntry =
     | VectorEntry
     ;
 
-type GuiTab = {
+export type GuiTab = {
     id: string;
     label: string;
     schema: GuiSchemaEntry[];

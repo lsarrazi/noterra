@@ -3,7 +3,7 @@ import { planetSurfaceConfig } from "../config";
 import Atmosphere from "../atmosphere/Atmosphere";
 import { CameraObservable } from "../traits/CameraObservable";
 import { GuiConfigurable } from "../traits/GuiConfigurable";
-import { SpacetimeEntity } from "../spacetime/SpacetimeEntity";
+import { SpacetimeEntity, SpacetimeState } from "../spacetime/SpacetimeEntity";
 
 type PlanetViewUniforms = {
     uTime: { value: number };
@@ -289,11 +289,15 @@ export default class PlanetView implements GuiConfigurable, CameraObservable, Sp
         this.setGridWidth(width);
     }
 
-    private spacetimeState: { time: number; tau: number; position: THREE.Vector3; velocity: THREE.Vector3; };
+    private spacetimeState: SpacetimeState;
 
-    onSpacetimeTick(state: { time: number; tau: number; position: THREE.Vector3; velocity: THREE.Vector3; }): void {
+    onSpacetimeTick(state: SpacetimeState): void {
         //this.group.position.copy(state.position);
         this.spacetimeState = state;
+    }
+
+    getSpacetimeState(): SpacetimeState {
+        return this.spacetimeState;
     }
 
     update(time: number, dt = 0.016): void {
@@ -510,6 +514,7 @@ export default class PlanetView implements GuiConfigurable, CameraObservable, Sp
             tabs: [
                 { id: "general", label: "General", schema: general },
                 { id: "camera", label: "Camera", schema: cameraPanel },
+                SpacetimeEntity.from(this).getSpacetimeGuiTab(),
                 ...(this.atmosphere?.getGuiSchema?.()?.tabs ?? []),
             ],
         };

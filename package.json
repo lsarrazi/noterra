@@ -20,6 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "lodash": "^4.17.21",
+    "mathjs": "^15.1.0",
     "three": "^0.182.0",
     "tweakpane": "^4.0.5"
   }

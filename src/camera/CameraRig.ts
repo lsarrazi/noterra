@@ -274,6 +274,13 @@ export default class CameraRig {
                             "type": "readonly",
                             "get": () => this.zoomTargetDistance - 0.5
                         },
+                        {
+                            "key": "fov",
+                            "label": "Field of view (°)",
+                            "type": "slider",
+                            "get": () => this.camera.fov,
+                            "set": (v: number) => { this.camera.fov = v; this.camera.updateProjectionMatrix(); }
+                        }
                     ]
                 }
 

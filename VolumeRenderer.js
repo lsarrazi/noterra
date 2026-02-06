@@ -2,23 +2,11 @@ import * as THREE from "three";
 
 const vertexShader = `
 varying vec2 vUv;
-varying vec3 vFarWorld;
-
-// Far plane corners in world space (computed on CPU for precision)
-uniform vec3 farTopLeft;
-uniform vec3 farTopRight;
-uniform vec3 farBottomLeft;
-uniform vec3 farBottomRight;
 
 void main() {
     // Fullscreen quad
     gl_Position = vec4(position.xy, 0.0, 1.0);
     vUv = uv;
-    
-    // Bilinear interpolation of far plane corners
-    vec3 top = mix(farTopLeft, farTopRight, uv.x);
-    vec3 bottom = mix(farBottomLeft, farBottomRight, uv.x);
-    vFarWorld = mix(bottom, top, uv.y);
 }`;
 
 const fragmentShader = `
@@ -147,12 +135,24 @@ uniform DirectionalLight directionalLights[NUM_DIR_LIGHTS];
  #endif
 #endif
 
+uniform vec3 farTopLeft;
+uniform vec3 farTopRight;
+uniform vec3 farBottomLeft;
+uniform vec3 farBottomRight;
+uniform vec2 resolution;
+
+vec3 farWorldFromUv(vec2 uv) {
+  vec3 bottom = mix(farBottomLeft, farBottomRight, uv.x);
+  vec3 top    = mix(farTopLeft,    farTopRight,    uv.x);
+  return mix(bottom, top, uv.y);
+}
+
 varying vec2 vUv;
-varying vec3 vFarWorld;
 
 void main() {
     // Cast a ray from the camera to the far plane (in world space)
     vec3 worldRayOrigin = cameraPosition;
+    vec3 vFarWorld = farWorldFromUv(vUv);
     vec3 worldRayDirection = normalize(vFarWorld - worldRayOrigin);
     
     // Transform ray into volume local space
@@ -500,6 +500,7 @@ export default class VolumeRenderer extends THREE.Mesh {
     near: { value: 0.1 },
     far: { value: 1000.0 },
     depthTexture: { value: null },
+    resolution: { value: new THREE.Vector2() },
 
     volumeOrigin: { value: new THREE.Vector3() },
     volumeSize: { value: new THREE.Vector3() },
