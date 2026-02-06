@@ -29,7 +29,7 @@ export const planetSurfaceConfig = {
     segments: 192,
     scale: 6.0,
     seaLevel: 0.48,
-    seaColor: 0x8a5d9a,
+    seaColor: 0x2a5d9a,
     landLow: 0x2f6a3a,
     landHigh: 0x9c8a5a,
     normalStrength: 0.12,
